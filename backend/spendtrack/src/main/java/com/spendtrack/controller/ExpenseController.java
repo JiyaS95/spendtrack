@@ -26,4 +26,12 @@ public class ExpenseController {
     public Expense addExpense(@RequestBody Expense expense) {
         return repo.save(expense);
     }
+    
+
+/*
+    @GetMapping ("/summary/category")
+    public List<Object[]> getCategorySummary() {
+        return repo.getCategorySummary();
+    }
+*/
 }

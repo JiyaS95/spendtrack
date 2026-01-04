@@ -11,10 +11,10 @@ public class Expense {
     @GeneratedValue(strategy = GenerationType.IDENTITY) //database automatically asigns a number to id whenever a new expense is added
 
     private Long id; //unique num for each expense
-    public LocalDate date;
-    public String category;
-    public double amount;
-    public String note;
+    private LocalDate date;
+    private String category;
+    private double amount;
+    private String note;
 
     public Expense() {
 
