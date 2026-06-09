@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from "rea
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API = "http://localhost:8080";
+const API = "https://studious-memory-wr596gpqw9xpcg6wr-8080.app.github.dev";
 
 export default function DashboardScreen({ navigation }) {
   const [expenses, setExpenses] = useState([]);

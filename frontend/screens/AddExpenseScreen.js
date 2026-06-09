@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from "react-native";
 import axios from "axios";
 
-const API = "http://localhost:8080";
+const API = "https://studious-memory-wr596gpqw9xpcg6wr-8080.app.github.dev";
 const CATEGORIES = ["Food", "Transport", "Shopping", "Entertainment", "Health", "Bills", "Other"];
 
 export default function AddExpenseScreen({ route, navigation }) {
