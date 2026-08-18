@@ -12,6 +12,7 @@ export default function InsightsScreen() {
   const [expenses, setExpenses] = useState([]);
   const [burnRate, setBurnRate] = useState(null);
   const [timeMachine, setTimeMachine] = useState(null);
+  const [habits, setHabits] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -23,14 +24,16 @@ export default function InsightsScreen() {
     const t = await AsyncStorage.getItem("token");
     const headers = { Authorization: `Bearer ${t}` };
     try {
-      const [expRes, burnRes, tmRes] = await Promise.all([
+      const [expRes, burnRes, tmRes, habitsRes] = await Promise.all([
         axios.get(`${API}/expenses`, { headers }),
         axios.get(`${API}/insights/burn-rate`, { headers }),
         axios.get(`${API}/insights/time-machine`, { headers }),
+        axios.get(`${API}/insights/habits`, { headers }),
       ]);
       setExpenses(expRes.data);
       setBurnRate(burnRes.data);
       setTimeMachine(tmRes.data);
+      setHabits(habitsRes.data);
     } catch (e) {}
   };
 
@@ -93,21 +96,22 @@ export default function InsightsScreen() {
     return {
       labels: allLabels.map(formatMonth),
       datasets: [
-        {
-          data: allLabels.map((_, i) => allActuals[i] ?? 0),
-          color: (opacity = 1) => `rgba(26, 158, 92, ${opacity})`,
-          strokeWidth: 2,
-        },
-        {
-          data: allLabels.map((_, i) => allProjected[i] ?? 0),
-          color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
-          strokeWidth: 2,
-          strokeDasharray: [6, 3],
-        },
+        { data: allLabels.map((_, i) => allActuals[i] ?? 0), color: (opacity = 1) => `rgba(26, 158, 92, ${opacity})`, strokeWidth: 2 },
+        { data: allLabels.map((_, i) => allProjected[i] ?? 0), color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`, strokeWidth: 2 },
       ],
       legend: ["Actual", "Projected"],
     };
   })() : null;
+
+  const formatDay = (d) => d.charAt(0) + d.slice(1).toLowerCase();
+
+  const habitItems = habits && !habits.message ? [
+    { icon: "fast-food-outline", color: "#f7971e", label: "Favourite category", value: habits.mostFrequentCategory },
+    { icon: "cash-outline", color: "#ff6584", label: "Costs you most", value: habits.mostExpensiveCategory },
+    { icon: "calendar-outline", color: "#4facfe", label: "Biggest spending day", value: formatDay(habits.biggestSpendingDay) + "s" },
+    { icon: "sunny-outline", color: "#43e97b", label: "You're a", value: habits.spenderType + " spender" },
+    { icon: "repeat-outline", color: "#a18cd1", label: "Avg expenses/week", value: `${habits.avgExpensesPerWeek}x` },
+  ] : [];
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -173,6 +177,23 @@ export default function InsightsScreen() {
           ))}
         </View>
 
+        {habitItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🧠 Your Spending Habits</Text>
+            <View style={styles.habitsCard}>
+              {habitItems.map((h, i) => (
+                <View key={i} style={[styles.habitRow, i < habitItems.length - 1 && styles.habitRowBorder]}>
+                  <View style={[styles.habitIcon, { backgroundColor: h.color + "22" }]}>
+                    <Ionicons name={h.icon} size={18} color={h.color} />
+                  </View>
+                  <Text style={styles.habitLabel}>{h.label}</Text>
+                  <Text style={[styles.habitValue, { color: h.color }]}>{h.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {burnRate && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>🔥 Burn Rate</Text>
@@ -196,15 +217,10 @@ export default function InsightsScreen() {
                 </View>
               </View>
               <View style={styles.burnTrack}>
-                <View style={[styles.burnFill, {
-                  width: `${Math.min(burnRate.burnPercent, 100)}%`,
-                  backgroundColor: getBurnColor(burnRate.burnPercent),
-                }]} />
+                <View style={[styles.burnFill, { width: `${Math.min(burnRate.burnPercent, 100)}%`, backgroundColor: getBurnColor(burnRate.burnPercent) }]} />
               </View>
               <View style={styles.burnFooter}>
-                <Text style={[styles.burnStatusText, { color: getBurnColor(burnRate.burnPercent) }]}>
-                  {getBurnLabel(burnRate.burnPercent)}
-                </Text>
+                <Text style={[styles.burnStatusText, { color: getBurnColor(burnRate.burnPercent) }]}>{getBurnLabel(burnRate.burnPercent)}</Text>
                 <Text style={styles.burnPct}>{burnRate.burnPercent}% of avg</Text>
               </View>
             </View>
@@ -229,7 +245,6 @@ export default function InsightsScreen() {
                 }}
                 style={{ borderRadius: 12 }}
                 withInnerLines={false}
-                withDots={true}
                 bezier
                 yAxisLabel="$"
               />
@@ -247,11 +262,7 @@ export default function InsightsScreen() {
             <View style={styles.insightBadge}>
               <Ionicons name="time-outline" size={16} color="#6c63ff" />
               <Text style={styles.insightText}>
-                At your current pace, you'll spend{" "}
-                <Text style={styles.insightHighlight}>
-                  ${timeMachine.projectionValues[2]?.toFixed(0)}/mo
-                </Text>{" "}
-                by {formatMonth(timeMachine.projectionLabels[2])}
+                At your current pace, you'll spend <Text style={styles.insightHighlight}>${timeMachine.projectionValues[2]?.toFixed(0)}/mo</Text> by {formatMonth(timeMachine.projectionLabels[2])}
               </Text>
             </View>
           </View>
@@ -288,6 +299,12 @@ const styles = StyleSheet.create({
   categoryAmt: { color: "#fff", fontSize: 13, fontWeight: "600", width: 50, textAlign: "right" },
   emptyCard: { alignItems: "center", padding: 40 },
   emptyText: { color: "#555", marginTop: 12, fontSize: 15, textAlign: "center" },
+  habitsCard: { backgroundColor: "#141414", borderRadius: 16, overflow: "hidden" },
+  habitRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
+  habitRowBorder: { borderBottomWidth: 1, borderBottomColor: "#1c1c1e" },
+  habitIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  habitLabel: { color: "#888", fontSize: 13, flex: 1 },
+  habitValue: { fontSize: 13, fontWeight: "700" },
   burnCard: { backgroundColor: "#141414", borderRadius: 16, padding: 20 },
   burnRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
   burnStat: { flex: 1, alignItems: "center" },
