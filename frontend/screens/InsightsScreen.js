@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, ScrollView, StyleSheet, Animated, Dimensions } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Animated, Dimensions, TouchableOpacity } from "react-native";
 import { BarChart, LineChart } from "react-native-chart-kit";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -7,18 +7,25 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API = "https://studious-memory-wr596gpqw9xpcg6wr-8080.app.github.dev";
 const SCREEN_WIDTH = Dimensions.get("window").width;
+const CATEGORIES = ["Food", "Transport", "Shopping", "Entertainment", "Health", "Bills", "Other"];
+const CUT_OPTIONS = [10, 20, 30, 50];
 
 export default function InsightsScreen() {
   const [expenses, setExpenses] = useState([]);
   const [burnRate, setBurnRate] = useState(null);
   const [timeMachine, setTimeMachine] = useState(null);
   const [habits, setHabits] = useState(null);
+  const [whatIfCategory, setWhatIfCategory] = useState("Food");
+  const [whatIfCut, setWhatIfCut] = useState(20);
+  const [whatIfResult, setWhatIfResult] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadData();
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
   }, []);
+
+  useEffect(() => { fetchWhatIf(); }, [whatIfCategory, whatIfCut]);
 
   const loadData = async () => {
     const t = await AsyncStorage.getItem("token");
@@ -34,6 +41,16 @@ export default function InsightsScreen() {
       setBurnRate(burnRes.data);
       setTimeMachine(tmRes.data);
       setHabits(habitsRes.data);
+    } catch (e) {}
+  };
+
+  const fetchWhatIf = async () => {
+    const t = await AsyncStorage.getItem("token");
+    try {
+      const res = await axios.get(`${API}/insights/whatif?category=${whatIfCategory}&cutPercent=${whatIfCut}`, {
+        headers: { Authorization: `Bearer ${t}` },
+      });
+      setWhatIfResult(res.data);
     } catch (e) {}
   };
 
@@ -140,17 +157,9 @@ export default function InsightsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Spending by Day of Week</Text>
             <View style={styles.chartCard}>
-              <BarChart
-                data={barData}
-                width={SCREEN_WIDTH - 64}
-                height={180}
-                chartConfig={chartConfig}
-                style={{ borderRadius: 12 }}
-                showValuesOnTopOfBars={false}
-                withInnerLines={false}
-                yAxisLabel="$"
-                yAxisSuffix=""
-              />
+              <BarChart data={barData} width={SCREEN_WIDTH - 64} height={180} chartConfig={chartConfig}
+                style={{ borderRadius: 12 }} showValuesOnTopOfBars={false} withInnerLines={false}
+                yAxisLabel="$" yAxisSuffix="" />
             </View>
             <View style={styles.insightBadge}>
               <Ionicons name="bulb-outline" size={16} color="#f7971e" />
@@ -231,23 +240,11 @@ export default function InsightsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>⏳ Financial Time Machine</Text>
             <View style={styles.chartCard}>
-              <LineChart
-                data={tmChartData}
-                width={SCREEN_WIDTH - 64}
-                height={200}
-                chartConfig={{
-                  backgroundGradientFrom: "#141414",
-                  backgroundGradientTo: "#141414",
-                  color: (opacity = 1) => `rgba(26, 158, 92, ${opacity})`,
-                  labelColor: () => "#888",
-                  decimalPlaces: 0,
-                  propsForDots: { r: "3" },
-                }}
-                style={{ borderRadius: 12 }}
-                withInnerLines={false}
-                bezier
-                yAxisLabel="$"
-              />
+              <LineChart data={tmChartData} width={SCREEN_WIDTH - 64} height={200}
+                chartConfig={{ backgroundGradientFrom: "#141414", backgroundGradientTo: "#141414",
+                  color: (opacity = 1) => `rgba(26, 158, 92, ${opacity})`, labelColor: () => "#888",
+                  decimalPlaces: 0, propsForDots: { r: "3" } }}
+                style={{ borderRadius: 12 }} withInnerLines={false} bezier yAxisLabel="$" />
             </View>
             <View style={styles.tmLegend}>
               <View style={styles.tmLegendItem}>
@@ -267,6 +264,52 @@ export default function InsightsScreen() {
             </View>
           </View>
         )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🤔 What If Simulator</Text>
+          <View style={styles.whatIfCard}>
+            <Text style={styles.whatIfLabel}>If I cut my spending on...</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {CATEGORIES.map(cat => (
+                <TouchableOpacity key={cat}
+                  style={[styles.chip, whatIfCategory === cat && styles.chipActive]}
+                  onPress={() => setWhatIfCategory(cat)}>
+                  <Text style={[styles.chipText, whatIfCategory === cat && styles.chipTextActive]}>{cat}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <Text style={styles.whatIfLabel}>...by this much:</Text>
+            <View style={styles.cutRow}>
+              {CUT_OPTIONS.map(pct => (
+                <TouchableOpacity key={pct}
+                  style={[styles.cutChip, whatIfCut === pct && styles.cutChipActive]}
+                  onPress={() => setWhatIfCut(pct)}>
+                  <Text style={[styles.cutChipText, whatIfCut === pct && styles.cutChipTextActive]}>{pct}%</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {whatIfResult && (
+              <View style={styles.whatIfResult}>
+                <View style={styles.whatIfRow}>
+                  <Ionicons name="save-outline" size={16} color="#1a9e5c" />
+                  <Text style={styles.whatIfResultText}>
+                    You'd save <Text style={styles.whatIfHighlight}>${whatIfResult.monthlySaving.toFixed(0)}/mo</Text> and <Text style={styles.whatIfHighlight}>${whatIfResult.yearlySaving.toFixed(0)}/yr</Text>
+                  </Text>
+                </View>
+                {whatIfResult.wishlistImpact?.map((w, i) => w.monthsSaved > 0 && (
+                  <View key={i} style={styles.whatIfRow}>
+                    <Ionicons name="star-outline" size={16} color="#f7971e" />
+                    <Text style={styles.whatIfResultText}>
+                      <Text style={styles.whatIfHighlight}>{w.name}</Text> would be {w.monthsSaved} months sooner
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
 
         {expenses.length === 0 && (
           <View style={styles.emptyCard}>
@@ -320,4 +363,20 @@ const styles = StyleSheet.create({
   tmLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   tmDot: { width: 8, height: 8, borderRadius: 4 },
   tmLegendText: { color: "#666", fontSize: 12 },
+  whatIfCard: { backgroundColor: "#141414", borderRadius: 16, padding: 20 },
+  whatIfLabel: { color: "#888", fontSize: 13, marginBottom: 10 },
+  chipScroll: { marginBottom: 16 },
+  chip: { backgroundColor: "#0d0d0d", borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: "#1c1c1e" },
+  chipActive: { backgroundColor: "#1a9e5c22", borderColor: "#1a9e5c" },
+  chipText: { color: "#555", fontSize: 13, fontWeight: "600" },
+  chipTextActive: { color: "#1a9e5c" },
+  cutRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
+  cutChip: { flex: 1, backgroundColor: "#0d0d0d", borderRadius: 12, padding: 12, alignItems: "center", borderWidth: 1, borderColor: "#1c1c1e" },
+  cutChipActive: { backgroundColor: "#6c63ff22", borderColor: "#6c63ff" },
+  cutChipText: { color: "#555", fontSize: 14, fontWeight: "700" },
+  cutChipTextActive: { color: "#6c63ff" },
+  whatIfResult: { backgroundColor: "#0d0d0d", borderRadius: 12, padding: 14, gap: 10 },
+  whatIfRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  whatIfResultText: { color: "#aaa", fontSize: 13, flex: 1 },
+  whatIfHighlight: { color: "#1a9e5c", fontWeight: "700" },
 });
