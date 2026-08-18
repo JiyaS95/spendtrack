@@ -1,6 +1,8 @@
 package com.spendtrack.controller;
 import com.spendtrack.entity.Expense;
+import com.spendtrack.entity.Wishlist;
 import com.spendtrack.repository.ExpenseRepository;
+import com.spendtrack.repository.WishlistRepository;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
@@ -13,7 +15,12 @@ import java.util.stream.Collectors;
 @RequestMapping("/insights")
 public class InsightsController {
     private final ExpenseRepository repo;
-    public InsightsController(ExpenseRepository repo) { this.repo = repo; }
+    private final WishlistRepository wishlistRepo;
+
+    public InsightsController(ExpenseRepository repo, WishlistRepository wishlistRepo) {
+        this.repo = repo;
+        this.wishlistRepo = wishlistRepo;
+    }
 
     private String uid() { return SecurityContextHolder.getContext().getAuthentication().getName(); }
 
@@ -86,31 +93,22 @@ public class InsightsController {
         String userId = uid();
         List<Expense> all = repo.findByUserId(userId);
         Map<String, Object> result = new LinkedHashMap<>();
-
         if (all.isEmpty()) {
             result.put("message", "Add more expenses to detect habits");
             return result;
         }
-
-        // Most frequent category
         Map<String, Long> categoryCount = all.stream()
             .collect(Collectors.groupingBy(Expense::getCategory, Collectors.counting()));
         String mostFrequentCategory = categoryCount.entrySet().stream()
             .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("N/A");
-
-        // Most expensive category
         Map<String, Double> categoryTotal = all.stream()
             .collect(Collectors.groupingBy(Expense::getCategory, Collectors.summingDouble(Expense::getAmount)));
         String mostExpensiveCategory = categoryTotal.entrySet().stream()
             .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse("N/A");
-
-        // Spending by day of week
         Map<DayOfWeek, Double> byDayOfWeek = all.stream()
             .collect(Collectors.groupingBy(e -> e.getDate().getDayOfWeek(), Collectors.summingDouble(Expense::getAmount)));
         DayOfWeek biggestDay = byDayOfWeek.entrySet().stream()
             .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(DayOfWeek.MONDAY);
-
-        // Weekend vs weekday
         double weekendSpend = all.stream()
             .filter(e -> e.getDate().getDayOfWeek() == DayOfWeek.SATURDAY || e.getDate().getDayOfWeek() == DayOfWeek.SUNDAY)
             .mapToDouble(Expense::getAmount).sum();
@@ -118,13 +116,10 @@ public class InsightsController {
             .filter(e -> e.getDate().getDayOfWeek() != DayOfWeek.SATURDAY && e.getDate().getDayOfWeek() != DayOfWeek.SUNDAY)
             .mapToDouble(Expense::getAmount).sum();
         String spenderType = weekendSpend > weekdaySpend ? "weekend" : "weekday";
-
-        // Avg expenses per week
         Optional<LocalDate> earliest = all.stream().map(Expense::getDate).min(Comparator.naturalOrder());
         long daySpan = earliest.map(d -> d.until(LocalDate.now(), java.time.temporal.ChronoUnit.DAYS)).orElse(7L);
         double weeksSpan = Math.max(daySpan / 7.0, 1.0);
         double avgPerWeek = all.size() / weeksSpan;
-
         result.put("mostFrequentCategory", mostFrequentCategory);
         result.put("mostExpensiveCategory", mostExpensiveCategory);
         result.put("biggestSpendingDay", biggestDay.toString());
@@ -133,6 +128,56 @@ public class InsightsController {
         result.put("weekendSpend", Math.round(weekendSpend * 100.0) / 100.0);
         result.put("weekdaySpend", Math.round(weekdaySpend * 100.0) / 100.0);
         result.put("totalExpenses", all.size());
+        return result;
+    }
+
+    @GetMapping("/whatif")
+    public Map<String, Object> whatIf(
+        @RequestParam String category,
+        @RequestParam double cutPercent
+    ) {
+        String userId = uid();
+        List<Expense> all = repo.findByUserId(userId);
+
+        // Avg monthly spend on this category over last 6 months
+        LocalDate now = LocalDate.now();
+        LocalDate sixMonthsAgo = now.minusMonths(6);
+        double categorySpend = all.stream()
+            .filter(e -> e.getCategory().equalsIgnoreCase(category) && e.getDate().isAfter(sixMonthsAgo))
+            .mapToDouble(Expense::getAmount).sum();
+        double avgMonthlyCategorySpend = categorySpend / 6.0;
+
+        double monthlySaving = avgMonthlyCategorySpend * (cutPercent / 100.0);
+        double yearlySaving = monthlySaving * 12;
+
+        // How does this affect wishlist timelines
+        List<Wishlist> wishlist = wishlistRepo.findByUserId(userId);
+        double totalMonthlySpend = all.stream()
+            .filter(e -> e.getDate().isAfter(sixMonthsAgo))
+            .mapToDouble(Expense::getAmount).sum() / 6.0;
+        double currentSavings = totalMonthlySpend * 0.2;
+        double newSavings = currentSavings + monthlySaving;
+
+        List<Map<String, Object>> wishlistImpact = new ArrayList<>();
+        for (Wishlist w : wishlist) {
+            Map<String, Object> impact = new LinkedHashMap<>();
+            impact.put("name", w.getName());
+            impact.put("targetPrice", w.getTargetPrice());
+            double oldMonths = currentSavings > 0 ? Math.ceil(w.getTargetPrice() / currentSavings) : -1;
+            double newMonths = newSavings > 0 ? Math.ceil(w.getTargetPrice() / newSavings) : -1;
+            impact.put("currentMonthsToGoal", oldMonths > 0 ? oldMonths : null);
+            impact.put("newMonthsToGoal", newMonths > 0 ? newMonths : null);
+            impact.put("monthsSaved", (oldMonths > 0 && newMonths > 0) ? Math.max(oldMonths - newMonths, 0) : null);
+            wishlistImpact.add(impact);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("category", category);
+        result.put("cutPercent", cutPercent);
+        result.put("avgMonthlyCategorySpend", Math.round(avgMonthlyCategorySpend * 100.0) / 100.0);
+        result.put("monthlySaving", Math.round(monthlySaving * 100.0) / 100.0);
+        result.put("yearlySaving", Math.round(yearlySaving * 100.0) / 100.0);
+        result.put("wishlistImpact", wishlistImpact);
         return result;
     }
 }
