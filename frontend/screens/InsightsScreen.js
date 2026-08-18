@@ -10,6 +10,8 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function InsightsScreen() {
   const [expenses, setExpenses] = useState([]);
+  const [burnRate, setBurnRate] = useState(null);
+  const [timeMachine, setTimeMachine] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -19,9 +21,16 @@ export default function InsightsScreen() {
 
   const loadData = async () => {
     const t = await AsyncStorage.getItem("token");
+    const headers = { Authorization: `Bearer ${t}` };
     try {
-      const res = await axios.get(`${API}/expenses`, { headers: { Authorization: `Bearer ${t}` } });
-      setExpenses(res.data);
+      const [expRes, burnRes, tmRes] = await Promise.all([
+        axios.get(`${API}/expenses`, { headers }),
+        axios.get(`${API}/insights/burn-rate`, { headers }),
+        axios.get(`${API}/insights/time-machine`, { headers }),
+      ]);
+      setExpenses(expRes.data);
+      setBurnRate(burnRes.data);
+      setTimeMachine(tmRes.data);
     } catch (e) {}
   };
 
@@ -57,6 +66,48 @@ export default function InsightsScreen() {
 
   const mostExpensiveDay = days.reduce((max, d) =>
     (dayTotals[d] || 0) > (dayTotals[max] || 0) ? d : max, days[0]);
+
+  const getBurnColor = (pct) => {
+    if (pct <= 90) return "#1a9e5c";
+    if (pct <= 110) return "#f7971e";
+    return "#ff6584";
+  };
+
+  const getBurnLabel = (pct) => {
+    if (pct <= 90) return "Under budget 🎉";
+    if (pct <= 110) return "On track 👍";
+    return "Overspending ⚠️";
+  };
+
+  const formatMonth = (yyyymm) => {
+    const [y, m] = yyyymm.split("-");
+    return new Date(y, m - 1).toLocaleDateString("en-US", { month: "short" });
+  };
+
+  const tmChartData = timeMachine ? (() => {
+    const allLabels = [...timeMachine.labels, ...timeMachine.projectionLabels];
+    const allActuals = [...timeMachine.actuals, ...timeMachine.projectionValues.map(() => null)];
+    const allProjected = [...timeMachine.actuals.map(() => null), ...timeMachine.projectionValues];
+    const lastActual = timeMachine.actuals[timeMachine.actuals.length - 1] || 0;
+    allProjected[timeMachine.actuals.length - 1] = lastActual;
+    return {
+      labels: allLabels.map(formatMonth),
+      datasets: [
+        {
+          data: allLabels.map((_, i) => allActuals[i] ?? 0),
+          color: (opacity = 1) => `rgba(26, 158, 92, ${opacity})`,
+          strokeWidth: 2,
+        },
+        {
+          data: allLabels.map((_, i) => allProjected[i] ?? 0),
+          color: (opacity = 1) => `rgba(108, 99, 255, ${opacity})`,
+          strokeWidth: 2,
+          strokeDasharray: [6, 3],
+        },
+      ],
+      legend: ["Actual", "Projected"],
+    };
+  })() : null;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -122,6 +173,90 @@ export default function InsightsScreen() {
           ))}
         </View>
 
+        {burnRate && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>🔥 Burn Rate</Text>
+            <View style={styles.burnCard}>
+              <View style={styles.burnRow}>
+                <View style={styles.burnStat}>
+                  <Text style={styles.burnLabel}>This Month</Text>
+                  <Text style={styles.burnValue}>${burnRate.currentMonthSpend.toFixed(0)}</Text>
+                </View>
+                <View style={styles.burnDivider} />
+                <View style={styles.burnStat}>
+                  <Text style={styles.burnLabel}>Monthly Avg</Text>
+                  <Text style={styles.burnValue}>${burnRate.avgMonthly.toFixed(0)}</Text>
+                </View>
+                <View style={styles.burnDivider} />
+                <View style={styles.burnStat}>
+                  <Text style={styles.burnLabel}>Projected</Text>
+                  <Text style={[styles.burnValue, { color: getBurnColor(burnRate.burnPercent) }]}>
+                    ${burnRate.projectedMonthEnd.toFixed(0)}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.burnTrack}>
+                <View style={[styles.burnFill, {
+                  width: `${Math.min(burnRate.burnPercent, 100)}%`,
+                  backgroundColor: getBurnColor(burnRate.burnPercent),
+                }]} />
+              </View>
+              <View style={styles.burnFooter}>
+                <Text style={[styles.burnStatusText, { color: getBurnColor(burnRate.burnPercent) }]}>
+                  {getBurnLabel(burnRate.burnPercent)}
+                </Text>
+                <Text style={styles.burnPct}>{burnRate.burnPercent}% of avg</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {timeMachine && tmChartData && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>⏳ Financial Time Machine</Text>
+            <View style={styles.chartCard}>
+              <LineChart
+                data={tmChartData}
+                width={SCREEN_WIDTH - 64}
+                height={200}
+                chartConfig={{
+                  backgroundGradientFrom: "#141414",
+                  backgroundGradientTo: "#141414",
+                  color: (opacity = 1) => `rgba(26, 158, 92, ${opacity})`,
+                  labelColor: () => "#888",
+                  decimalPlaces: 0,
+                  propsForDots: { r: "3" },
+                }}
+                style={{ borderRadius: 12 }}
+                withInnerLines={false}
+                withDots={true}
+                bezier
+                yAxisLabel="$"
+              />
+            </View>
+            <View style={styles.tmLegend}>
+              <View style={styles.tmLegendItem}>
+                <View style={[styles.tmDot, { backgroundColor: "#1a9e5c" }]} />
+                <Text style={styles.tmLegendText}>Actual spending</Text>
+              </View>
+              <View style={styles.tmLegendItem}>
+                <View style={[styles.tmDot, { backgroundColor: "#6c63ff" }]} />
+                <Text style={styles.tmLegendText}>Projected (3 months)</Text>
+              </View>
+            </View>
+            <View style={styles.insightBadge}>
+              <Ionicons name="time-outline" size={16} color="#6c63ff" />
+              <Text style={styles.insightText}>
+                At your current pace, you'll spend{" "}
+                <Text style={styles.insightHighlight}>
+                  ${timeMachine.projectionValues[2]?.toFixed(0)}/mo
+                </Text>{" "}
+                by {formatMonth(timeMachine.projectionLabels[2])}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {expenses.length === 0 && (
           <View style={styles.emptyCard}>
             <Ionicons name="bar-chart-outline" size={48} color="#333" />
@@ -144,7 +279,7 @@ const styles = StyleSheet.create({
   sectionTitle: { color: "#fff", fontSize: 18, fontWeight: "700", marginBottom: 14 },
   chartCard: { backgroundColor: "#141414", borderRadius: 16, padding: 16, alignItems: "center" },
   insightBadge: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#f7971e22", padding: 12, borderRadius: 12, marginTop: 10, borderWidth: 1, borderColor: "#f7971e44" },
-  insightText: { color: "#aaa", fontSize: 13 },
+  insightText: { color: "#aaa", fontSize: 13, flex: 1 },
   insightHighlight: { color: "#f7971e", fontWeight: "700" },
   categoryRow: { flexDirection: "row", alignItems: "center", marginBottom: 12, gap: 10 },
   categoryName: { color: "#aaa", fontSize: 13, width: 90 },
@@ -153,4 +288,19 @@ const styles = StyleSheet.create({
   categoryAmt: { color: "#fff", fontSize: 13, fontWeight: "600", width: 50, textAlign: "right" },
   emptyCard: { alignItems: "center", padding: 40 },
   emptyText: { color: "#555", marginTop: 12, fontSize: 15, textAlign: "center" },
+  burnCard: { backgroundColor: "#141414", borderRadius: 16, padding: 20 },
+  burnRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16 },
+  burnStat: { flex: 1, alignItems: "center" },
+  burnLabel: { color: "#666", fontSize: 11, marginBottom: 4 },
+  burnValue: { color: "#fff", fontSize: 20, fontWeight: "800" },
+  burnDivider: { width: 1, backgroundColor: "#222", marginHorizontal: 8 },
+  burnTrack: { height: 8, backgroundColor: "#222", borderRadius: 4, marginBottom: 12 },
+  burnFill: { height: 8, borderRadius: 4 },
+  burnFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  burnStatusText: { fontSize: 13, fontWeight: "700" },
+  burnPct: { color: "#555", fontSize: 12 },
+  tmLegend: { flexDirection: "row", gap: 16, marginTop: 10, marginBottom: 4 },
+  tmLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  tmDot: { width: 8, height: 8, borderRadius: 4 },
+  tmLegendText: { color: "#666", fontSize: 12 },
 });
