@@ -15,6 +15,7 @@ export default function InsightsScreen() {
   const [burnRate, setBurnRate] = useState(null);
   const [timeMachine, setTimeMachine] = useState(null);
   const [habits, setHabits] = useState(null);
+  const [anomalies, setAnomalies] = useState([]);
   const [whatIfCategory, setWhatIfCategory] = useState("Food");
   const [whatIfCut, setWhatIfCut] = useState(20);
   const [whatIfResult, setWhatIfResult] = useState(null);
@@ -31,16 +32,18 @@ export default function InsightsScreen() {
     const t = await AsyncStorage.getItem("token");
     const headers = { Authorization: `Bearer ${t}` };
     try {
-      const [expRes, burnRes, tmRes, habitsRes] = await Promise.all([
+      const [expRes, burnRes, tmRes, habitsRes, anomRes] = await Promise.all([
         axios.get(`${API}/expenses`, { headers }),
         axios.get(`${API}/insights/burn-rate`, { headers }),
         axios.get(`${API}/insights/time-machine`, { headers }),
         axios.get(`${API}/insights/habits`, { headers }),
+        axios.get(`${API}/anomalies`, { headers }),
       ]);
       setExpenses(expRes.data);
       setBurnRate(burnRes.data);
       setTimeMachine(tmRes.data);
       setHabits(habitsRes.data);
+      setAnomalies(anomRes.data);
     } catch (e) {}
   };
 
@@ -102,6 +105,10 @@ export default function InsightsScreen() {
   const formatMonth = (yyyymm) => {
     const [y, m] = yyyymm.split("-");
     return new Date(y, m - 1).toLocaleDateString("en-US", { month: "short" });
+  };
+
+  const formatAnomalyDate = (d) => {
+    return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const tmChartData = timeMachine ? (() => {
@@ -265,6 +272,29 @@ export default function InsightsScreen() {
           </View>
         )}
 
+        {anomalies.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Unusual Purchases</Text>
+            <View style={styles.anomalyCard}>
+              {anomalies.map((a, i) => (
+                <View key={a.id} style={[styles.anomalyRow, i < anomalies.length - 1 && styles.habitRowBorder]}>
+                  <View style={styles.anomalyIcon}>
+                    <Ionicons name="alert-circle-outline" size={18} color="#ff6584" />
+                  </View>
+                  <View style={styles.anomalyBody}>
+                    <View style={styles.anomalyTopLine}>
+                      <Text style={styles.anomalyCategory}>{a.category}</Text>
+                      <Text style={styles.anomalyAmount}>${a.amount.toFixed(0)}</Text>
+                    </View>
+                    <Text style={styles.anomalyDate}>{formatAnomalyDate(a.date)}</Text>
+                    {a.reason && <Text style={styles.anomalyReason}>{a.reason}</Text>}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🤔 What If Simulator</Text>
           <View style={styles.whatIfCard}>
@@ -363,6 +393,15 @@ const styles = StyleSheet.create({
   tmLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   tmDot: { width: 8, height: 8, borderRadius: 4 },
   tmLegendText: { color: "#666", fontSize: 12 },
+  anomalyCard: { backgroundColor: "#141414", borderRadius: 16, overflow: "hidden" },
+  anomalyRow: { flexDirection: "row", padding: 14, gap: 12 },
+  anomalyIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#ff658422" },
+  anomalyBody: { flex: 1 },
+  anomalyTopLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  anomalyCategory: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  anomalyAmount: { color: "#ff6584", fontSize: 14, fontWeight: "800" },
+  anomalyDate: { color: "#555", fontSize: 11, marginTop: 2 },
+  anomalyReason: { color: "#aaa", fontSize: 13, marginTop: 6, lineHeight: 18 },
   whatIfCard: { backgroundColor: "#141414", borderRadius: 16, padding: 20 },
   whatIfLabel: { color: "#888", fontSize: 13, marginBottom: 10 },
   chipScroll: { marginBottom: 16 },
