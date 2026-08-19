@@ -1,7 +1,7 @@
 import os
 import psycopg2
-from psycopg2.extras import RealDictCursor
 from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -15,7 +15,6 @@ conn = psycopg2.connect(
     password=os.getenv("DB_PASSWORD"),
 )
 
-# Step 1: pull every user's expenses into a table pandas can work with
 query = 'SELECT id, user_id AS "userId", date, category, amount FROM expense ORDER BY user_id, date'
 expenses_df = pd.read_sql(query, conn)
 
@@ -26,32 +25,29 @@ if expenses_df.empty:
 
 results = []
 
-# Step 2: run anomaly detection separately for each user
-# (spending patterns are personal, so we don't mix users together)
 for user_id, user_df in expenses_df.groupby("userId"):
     if len(user_df) < 10:
-        # not enough data yet for this user's patterns to mean anything
         continue
 
     user_df = user_df.copy()
     user_df["date"] = pd.to_datetime(user_df["date"])
-    user_df["day_of_week"] = user_df["date"].dt.dayofweek  # 0=Monday ... 6=Sunday
-
-    # turn category text into a number the model can use
+    user_df["day_of_week"] = user_df["date"].dt.dayofweek
     user_df["category_code"] = user_df["category"].astype("category").cat.codes
 
-    # how many days since the last expense in the same category
-    user_df = user_df.sort_values("date")
-    user_df["days_since_last_same_category"] = (
-        user_df.groupby("category")["date"].diff().dt.days.fillna(999)
-    )
+    # the key signal: how far is this amount from THIS user's normal amount
+    # for THIS SAME category (not their overall average across everything)
+    cat_mean = user_df.groupby("category")["amount"].transform("mean")
+    cat_std = user_df.groupby("category")["amount"].transform("std").fillna(1).replace(0, 1)
+    user_df["amount_zscore_in_category"] = (user_df["amount"] - cat_mean) / cat_std
 
-    features = user_df[["amount", "day_of_week", "category_code", "days_since_last_same_category"]]
+    raw_features = user_df[["amount", "amount_zscore_in_category", "day_of_week", "category_code"]]
 
-    # contamination=0.05 means: assume roughly 5% of this user's expenses are unusual
+    scaler = StandardScaler()
+    features = scaler.fit_transform(raw_features)
+
     model = IsolationForest(contamination=0.05, random_state=42)
-    user_df["anomaly_flag"] = model.fit_predict(features)   # -1 = anomaly, 1 = normal
-    user_df["anomaly_score"] = model.decision_function(features)  # lower = more unusual
+    user_df["anomaly_flag"] = model.fit_predict(features)
+    user_df["anomaly_score"] = model.decision_function(features)
 
     anomalies = user_df[user_df["anomaly_flag"] == -1]
 
@@ -64,7 +60,6 @@ for user_id, user_df in expenses_df.groupby("userId"):
 
 print(f"Found {len(results)} anomalies across all users.")
 
-# Step 3: save results into the anomalies table (skip ones already flagged)
 with conn.cursor() as cur:
     for r in results:
         cur.execute(
