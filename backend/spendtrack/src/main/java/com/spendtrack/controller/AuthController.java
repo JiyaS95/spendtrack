@@ -3,8 +3,10 @@ import com.spendtrack.entity.User;
 import com.spendtrack.repository.UserRepository;
 import com.spendtrack.security.JwtUtil;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -24,11 +26,17 @@ public class AuthController {
         this.jwtUtil = jwtUtil;
     }
 
+    private String uid() { return SecurityContextHolder.getContext().getAuthentication().getName(); }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
         String email = body.get("email");
         String password = body.get("password");
+        String name = body.get("name");
 
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Please enter your name");
+        }
         if (email == null || !EMAIL_PATTERN.matcher(email).matches()) {
             return ResponseEntity.badRequest().body("Please enter a valid email address");
         }
@@ -42,7 +50,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Email already registered");
         }
 
-        User user = new User(email, passwordEncoder.encode(password));
+        User user = new User(email, passwordEncoder.encode(password), name.trim());
         userRepo.save(user);
         return ResponseEntity.ok("User registered successfully");
     }
@@ -57,6 +65,21 @@ public class AuthController {
         }
         String token = jwtUtil.generateToken(email);
         return ResponseEntity.ok(Map.of("token", token));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me() {
+        String email = uid();
+        Optional<User> userOpt = userRepo.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("User not found");
+        }
+        User user = userOpt.get();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", user.getName());
+        result.put("email", user.getEmail());
+        result.put("joinedDate", user.getJoinedDate());
+        return ResponseEntity.ok(result);
     }
 
     private String validatePassword(String password) {

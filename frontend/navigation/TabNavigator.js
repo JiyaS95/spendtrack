@@ -6,9 +6,8 @@ import AddExpenseScreen from "../screens/AddExpenseScreen";
 import BudgetScreen from "../screens/BudgetScreen";
 import InsightsScreen from "../screens/InsightsScreen";
 import WishlistScreen from "../screens/WishlistScreen";
-
+import ProfileScreen from "../screens/ProfileScreen";
 const Tab = createBottomTabNavigator();
-
 export default function TabNavigator() {
   return (
     <Tab.Navigator
@@ -30,6 +29,7 @@ export default function TabNavigator() {
             Budget: "wallet",
             Insights: "bar-chart",
             Wishlist: "star",
+            Profile: "person-circle",
           };
           return <Ionicons name={icons[route.name]} size={size} color={color} />;
         },
@@ -40,6 +40,7 @@ export default function TabNavigator() {
       <Tab.Screen name="Budget" component={BudgetScreen} />
       <Tab.Screen name="Insights" component={InsightsScreen} />
       <Tab.Screen name="Wishlist" component={WishlistScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

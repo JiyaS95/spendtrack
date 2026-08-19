@@ -11,21 +11,12 @@ public class JwtUtil {
     private final long EXPIRATION = 1000 * 60 * 60 * 24; // 24 hours
 
     public String generateToken(String email) {
-        return Jwts.parserBuilder().setSigningKey(key).build()
-            .parseClaimsJws(
-                Jwts.builder()
-                    .setSubject(email)
-                    .setIssuedAt(new Date())
-                    .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                    .signWith(key)
-                    .compact()
-            ).getBody().getSubject() == null ? null :
-            Jwts.builder()
-                .setSubject(email)
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(key)
-                .compact();
+        return Jwts.builder()
+            .setSubject(email)
+            .setIssuedAt(new Date())
+            .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
+            .signWith(key)
+            .compact();
     }
 
     public String extractEmail(String token) {

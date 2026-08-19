@@ -8,6 +8,7 @@ const W = Dimensions.get("window").width;
 
 export default function LoginScreen({ navigation }) {
   const [screen, setScreen] = useState("about");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
@@ -30,9 +31,23 @@ export default function LoginScreen({ navigation }) {
     ]).start();
   };
 
+  // pulls the real message the backend sent back, instead of showing a generic one
+  const getErrorMessage = (e, fallback) => {
+    if (e.response && typeof e.response.data === "string") {
+      return e.response.data;
+    }
+    if (e.response && e.response.data && e.response.data.message) {
+      return e.response.data.message;
+    }
+    return fallback;
+  };
+
   const handleSubmit = async () => {
     animateButton();
-    if (!email || !password) return Alert.alert("Error", "Please fill in all fields");
+    if (!isLogin && !name.trim()) {
+      return Alert.alert("Missing info", "Please enter your name");
+    }
+    if (!email || !password) return Alert.alert("Missing info", "Please fill in all fields");
     setLoading(true);
     try {
       if (isLogin) {
@@ -40,12 +55,14 @@ export default function LoginScreen({ navigation }) {
         await AsyncStorage.setItem("token", res.data.token);
         navigation.replace("Main");
       } else {
-        await axios.post(`${API}/auth/register`, { email, password });
-        Alert.alert("Success!", "Account created. Sign in now.");
+        await axios.post(`${API}/auth/register`, { name, email, password });
+        Alert.alert("Account created!", "Your account was created successfully. Sign in now.");
         setIsLogin(true);
+        setPassword("");
       }
     } catch (e) {
-      Alert.alert("Error", isLogin ? "Invalid credentials" : "Registration failed");
+      const message = getErrorMessage(e, isLogin ? "Invalid credentials" : "Registration failed");
+      Alert.alert(isLogin ? "Couldn't sign in" : "Couldn't create account", message);
     }
     setLoading(false);
   };
@@ -140,6 +157,14 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.authHeading}>{isLogin ? "Welcome back" : "Create account"}</Text>
         <Text style={styles.authSub}>{isLogin ? "Sign in to your account" : "Start tracking for free"}</Text>
 
+        {!isLogin && (
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputIcon}>🙂</Text>
+            <TextInput style={styles.input} placeholder="Your name" placeholderTextColor="#555"
+              value={name} onChangeText={setName} autoCapitalize="words" />
+          </View>
+        )}
+
         <View style={styles.inputWrapper}>
           <Text style={styles.inputIcon}>✉️</Text>
           <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#555"
@@ -150,6 +175,12 @@ export default function LoginScreen({ navigation }) {
           <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#555"
             value={password} onChangeText={setPassword} secureTextEntry />
         </View>
+
+        {!isLogin && (
+          <Text style={styles.passwordHint}>
+            Must be 8+ characters, with at least one uppercase letter and one number.
+          </Text>
+        )}
 
         <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
           <TouchableOpacity style={styles.authButton} onPress={handleSubmit} disabled={loading}>
@@ -208,6 +239,7 @@ const styles = StyleSheet.create({
   inputWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: "#0d0d0d", borderRadius: 14, marginBottom: 14, paddingHorizontal: 14, borderWidth: 1, borderColor: "#222" },
   inputIcon: { fontSize: 16, marginRight: 10 },
   input: { flex: 1, color: "#fff", padding: 16, fontSize: 15 },
+  passwordHint: { color: "#666", fontSize: 12, marginTop: -6, marginBottom: 16, lineHeight: 17 },
   authButton: { backgroundColor: "#1a9e5c", padding: 18, borderRadius: 16, alignItems: "center", shadowColor: "#1a9e5c", shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 16 },
   authButtonText: { color: "#fff", fontSize: 16, fontWeight: "800" },
   switchText: { color: "#555", fontSize: 14 },
