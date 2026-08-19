@@ -16,6 +16,7 @@ export default function InsightsScreen() {
   const [timeMachine, setTimeMachine] = useState(null);
   const [habits, setHabits] = useState(null);
   const [anomalies, setAnomalies] = useState([]);
+  const [badges, setBadges] = useState([]);
   const [whatIfCategory, setWhatIfCategory] = useState("Food");
   const [whatIfCut, setWhatIfCut] = useState(20);
   const [whatIfResult, setWhatIfResult] = useState(null);
@@ -32,18 +33,20 @@ export default function InsightsScreen() {
     const t = await AsyncStorage.getItem("token");
     const headers = { Authorization: `Bearer ${t}` };
     try {
-      const [expRes, burnRes, tmRes, habitsRes, anomRes] = await Promise.all([
+      const [expRes, burnRes, tmRes, habitsRes, anomRes, badgesRes] = await Promise.all([
         axios.get(`${API}/expenses`, { headers }),
         axios.get(`${API}/insights/burn-rate`, { headers }),
         axios.get(`${API}/insights/time-machine`, { headers }),
         axios.get(`${API}/insights/habits`, { headers }),
         axios.get(`${API}/anomalies`, { headers }),
+        axios.get(`${API}/badges`, { headers }),
       ]);
       setExpenses(expRes.data);
       setBurnRate(burnRes.data);
       setTimeMachine(tmRes.data);
       setHabits(habitsRes.data);
       setAnomalies(anomRes.data);
+      setBadges(badgesRes.data);
     } catch (e) {}
   };
 
@@ -137,6 +140,8 @@ export default function InsightsScreen() {
     { icon: "repeat-outline", color: "#a18cd1", label: "Avg expenses/week", value: `${habits.avgExpensesPerWeek}x` },
   ] : [];
 
+  const earnedCount = badges.filter(b => b.earned).length;
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <Animated.View style={{ opacity: fadeAnim }}>
@@ -159,6 +164,30 @@ export default function InsightsScreen() {
             <Text style={styles.statLabel}>Top Category</Text>
           </View>
         </View>
+
+        {badges.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.badgesHeader}>
+              <Text style={styles.sectionTitle}>Badges</Text>
+              <Text style={styles.badgesCount}>{earnedCount}/{badges.length}</Text>
+            </View>
+            <View style={styles.badgesGrid}>
+              {badges.map((b) => (
+                <View key={b.id} style={[styles.badgeCard, !b.earned && styles.badgeCardLocked]}>
+                  <View style={[styles.badgeIconWrap, b.earned && styles.badgeIconWrapEarned]}>
+                    <Ionicons
+                      name={b.earned ? b.icon : "lock-closed-outline"}
+                      size={20}
+                      color={b.earned ? "#1a9e5c" : "#444"}
+                    />
+                  </View>
+                  <Text style={[styles.badgeName, !b.earned && styles.badgeNameLocked]}>{b.name}</Text>
+                  <Text style={styles.badgeDescription}>{b.description}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         {expenses.length > 0 && (
           <View style={styles.section}>
@@ -402,6 +431,16 @@ const styles = StyleSheet.create({
   anomalyAmount: { color: "#ff6584", fontSize: 14, fontWeight: "800" },
   anomalyDate: { color: "#555", fontSize: 11, marginTop: 2 },
   anomalyReason: { color: "#aaa", fontSize: 13, marginTop: 6, lineHeight: 18 },
+  badgesHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  badgesCount: { color: "#666", fontSize: 13, fontWeight: "600" },
+  badgesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  badgeCard: { width: (SCREEN_WIDTH - 40 - 20) / 3, backgroundColor: "#141414", borderRadius: 14, padding: 12, alignItems: "center", gap: 6 },
+  badgeCardLocked: { opacity: 0.55 },
+  badgeIconWrap: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#1c1c1e", alignItems: "center", justifyContent: "center" },
+  badgeIconWrapEarned: { backgroundColor: "#1a9e5c22" },
+  badgeName: { color: "#fff", fontSize: 12, fontWeight: "700", textAlign: "center" },
+  badgeNameLocked: { color: "#666" },
+  badgeDescription: { color: "#666", fontSize: 10, textAlign: "center", lineHeight: 13 },
   whatIfCard: { backgroundColor: "#141414", borderRadius: 16, padding: 20 },
   whatIfLabel: { color: "#888", fontSize: 13, marginBottom: 10 },
   chipScroll: { marginBottom: 16 },
