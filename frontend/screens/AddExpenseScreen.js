@@ -7,13 +7,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const API = "https://sturdy-umbrella-r46r9pq5j4vgfpj7p-8080.app.github.dev";
 
 const CATEGORIES = [
-  { name: "Food", emoji: "🍔" },
-  { name: "Transport", emoji: "🚗" },
-  { name: "Shopping", emoji: "🛍️" },
-  { name: "Entertainment", emoji: "🎮" },
-  { name: "Health", emoji: "💊" },
-  { name: "Bills", emoji: "📄" },
-  { name: "Other", emoji: "💸" },
+  { name: "Food" },
+  { name: "Transport"},
+  { name: "Shopping"},
+  { name: "Entertainment"},
+  { name: "Health"},
+  { name: "Bills"},
+  { name: "Other"},
 ];
 
 export default function AddExpenseScreen() {

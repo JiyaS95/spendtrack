@@ -73,7 +73,6 @@ export default function LoginScreen({ navigation }) {
         <Animated.View style={{ opacity: heroAnim, transform: [{ translateY: slideAnim }] }}>
 
           <View style={styles.heroSection}>
-            <Text style={styles.heroEmoji}>💰</Text>
             <Text style={styles.heroAppName}>SpendTrack</Text>
             <Text style={styles.heroTitle}>Know where your money <Text style={styles.heroAccent}>actually goes.</Text></Text>
             <Text style={styles.heroSub}>Track spending. Set budgets. Predict your future.</Text>
@@ -97,7 +96,6 @@ export default function LoginScreen({ navigation }) {
           </View>
 
           <View style={styles.bigFeatureCard}>
-            <Text style={styles.bigFeatureEmoji}>📊</Text>
             <Text style={styles.bigFeatureLabel}>CORE FEATURE</Text>
             <Text style={styles.bigFeatureTitle}>Visual spending dashboard</Text>
             <Text style={styles.bigFeatureDesc}>Pie charts, bar graphs, and category breakdowns that make your finances impossible to ignore.</Text>
@@ -105,12 +103,10 @@ export default function LoginScreen({ navigation }) {
 
           <View style={styles.twoCol}>
             <View style={[styles.smallCard, { marginRight: 8 }]}>
-              <Text style={styles.smallCardEmoji}>🎯</Text>
               <Text style={styles.smallCardTitle}>Budget Warnings</Text>
               <Text style={styles.smallCardDesc}>Green → Yellow → Red as you approach limits.</Text>
             </View>
             <View style={[styles.smallCard, { marginLeft: 8 }]}>
-              <Text style={styles.smallCardEmoji}>🔮</Text>
               <Text style={styles.smallCardTitle}>Predictions</Text>
               <Text style={styles.smallCardDesc}>See when you can afford your next big purchase.</Text>
             </View>
@@ -118,12 +114,10 @@ export default function LoginScreen({ navigation }) {
 
           <View style={styles.twoCol}>
             <View style={[styles.smallCard, { marginRight: 8 }]}>
-              <Text style={styles.smallCardEmoji}>💡</Text>
               <Text style={styles.smallCardTitle}>Habit Detection</Text>
               <Text style={styles.smallCardDesc}>Patterns you never noticed, now impossible to miss.</Text>
             </View>
             <View style={[styles.smallCard, { marginLeft: 8 }]}>
-              <Text style={styles.smallCardEmoji}>🏆</Text>
               <Text style={styles.smallCardTitle}>Milestones</Text>
               <Text style={styles.smallCardDesc}>Unlock badges as your savings grow.</Text>
             </View>
@@ -150,7 +144,6 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
       <View style={styles.authTop}>
-        <Text style={styles.authEmoji}>💰</Text>
         <Text style={styles.authTitle}>SpendTrack</Text>
       </View>
       <View style={styles.authCard}>
@@ -159,19 +152,16 @@ export default function LoginScreen({ navigation }) {
 
         {!isLogin && (
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputIcon}>🙂</Text>
             <TextInput style={styles.input} placeholder="Your name" placeholderTextColor="#555"
               value={name} onChangeText={setName} autoCapitalize="words" />
           </View>
         )}
 
         <View style={styles.inputWrapper}>
-          <Text style={styles.inputIcon}>✉️</Text>
           <TextInput style={styles.input} placeholder="Email address" placeholderTextColor="#555"
             value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
         </View>
         <View style={styles.inputWrapper}>
-          <Text style={styles.inputIcon}>🔒</Text>
           <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#555"
             value={password} onChangeText={setPassword} secureTextEntry />
         </View>
