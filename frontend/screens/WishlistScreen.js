@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API = "https://studious-memory-wr596gpqw9xpcg6wr-8080.app.github.dev";
+const API = "https://sturdy-umbrella-r46r9pq5j4vgfpj7p-8080.app.github.dev";
 
 export default function WishlistScreen() {
   const [items, setItems] = useState([]);
